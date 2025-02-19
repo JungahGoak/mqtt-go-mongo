@@ -1,0 +1,92 @@
+version: "3.8"
+
+services:
+  # MQTT broker (Mosquitto)
+  mosquitto:
+    image: eclipse-mosquitto
+    container_name: mosquitto
+    ports:
+      - "1883:1883"   # MQTT 기본
+      - "9001:9001"   # MQTT 웹소켓 
+    volumes:
+      - ./config/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - ./volumes/mosquitto_data:/mosquitto/data
+      - ./volumes/mosquitto_log:/mosquitto/log
+    restart: always
+
+  # Go MQTT Consumer (MQTT → MongoDB)
+  mqtt-go-mongo:
+    build: .
+    container_name: mqtt-go-mongo
+    depends_on:
+      - mosquitto
+      - mongo
+    environment:
+      MQTT_BROKER: "mosquitto:1883"
+      MQTT_PROTOCOL: "mqtt"
+      MONGO_URI: "mongodb://mongo:27017/mqtt_data"
+    restart: always
+
+  # MongoDB
+  mongo:
+    image: mongo
+    container_name: mongo
+    ports:
+      - "27017:27017"  # MongoDB 기본 포트
+    volumes:
+      - ./volumes/mongodb_data:/data/db
+    restart: always
+
+  # Mongo Express (MongoDB UI)
+  mongo-express:
+    image: mongo-express
+    container_name: mongo-express
+    depends_on:
+      - mongo
+    environment:
+      ME_CONFIG_MONGODB_SERVER: "mongo"
+      ME_CONFIG_BASICAUTH_USERNAME: "admin"
+      ME_CONFIG_BASICAUTH_PASSWORD: "password"
+    ports:
+      - "8081:8081"  # MongoDB 웹 UI
+    restart: always
+
+  # MongoDB Exporter (MongoDB → Prometheus)
+  mongodb-exporter:
+    image: percona/mongodb_exporter:0.39
+    container_name: mongodb-exporter
+    restart: always
+    ports:
+      - "9216:9216"
+    depends_on:
+      - mongo
+    command:
+      - "--mongodb.uri=mongodb://mongo:27017"
+      - "--collect-all"
+
+  # Prometheus (모니터링 데이터)
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    volumes:
+      - ./config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"  # Prometheus 웹 UI
+    restart: always
+
+  # Grafana (시각화)
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    ports:
+      - "3000:3000"  # Grafana 웹 UI
+    depends_on:
+      - prometheus
+    volumes:
+      - ./volumes/grafana_data:/var/lib/grafana
+    restart: always
+
+volumes:
+  mongodb_data:
+  grafana_data:
+

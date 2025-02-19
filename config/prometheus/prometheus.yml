@@ -1,0 +1,9 @@
+global:
+  scrape_interval: 5s  # 5초마다 데이터 수집
+
+scrape_configs:
+  # 2️⃣ MongoDB 모니터링 (MongoDB Exporter 사용)
+  - job_name: "mongodb"
+    static_configs:
+      - targets: ["mongodb-exporter:9216"]
+
